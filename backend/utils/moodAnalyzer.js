@@ -2,44 +2,57 @@ const Sentiment = require('sentiment');
 const sentiment = new Sentiment();
 
 /**
- * NLP-based Mood Detection System
- * 
- * Uses sentiment analysis combined with keyword pattern matching
- * to detect emotional states from user text.
- * 
- * @param {string} text - User's message
- * @returns {string} - Detected mood: Motivated, Neutral, Stressed, Burnt Out, or Anxious
+ * Enhanced NLP-based Mood Detection System
+ * More sensitive and accurate emotional recognition
  */
 const analyzeMood = (text) => {
+  // Convert to lowercase for better matching
+  const lowerText = text.toLowerCase();
+  
   // Base sentiment analysis
   const result = sentiment.analyze(text);
   
-  // Keyword patterns for specific moods
-  const burnoutKeywords = /burnout|burnt out|exhausted|drained|can't take it|giving up|no energy|overwhelmed|breaking down/i;
-  const anxiousKeywords = /anxious|anxiety|worried|nervous|panic|scared|fear|restless|uneasy|tense/i;
-  const stressedKeywords = /stressed|stress|pressure|deadline|too much|overworked|frustrated|struggling|difficult/i;
-  const motivatedKeywords = /motivated|excited|great|awesome|happy|energized|productive|accomplished|proud|confident/i;
+  // Enhanced keyword patterns - MORE SENSITIVE
+  const burnoutKeywords = /\b(burnout|burnt out|exhausted|drained|can'?t take|giving up|no energy|overwhelmed|breaking down|can'?t cope|too tired|worn out|depleted|finished)\b/i;
+  
+  const anxiousKeywords = /\b(anxious|anxiety|worried|nervous|panic|scared|fear|restless|uneasy|tense|afraid|terrified|frightened|paranoid|worried sick|on edge)\b/i;
+  
+  const stressedKeywords = /\b(stressed|stress|pressure|deadline|too much|overworked|frustrated|struggling|difficult|hard time|under pressure|swamped|overwhelm)\b/i;
+  
+  const sadKeywords = /\b(sad|unhappy|depressed|down|low|miserable|upset|hurt|crying|tears|lonely|alone|heartbroken|devastated|blue|gloomy|sorrowful)\b/i;
+  
+  const motivatedKeywords = /\b(motivated|excited|great|awesome|happy|energized|productive|accomplished|proud|confident|fantastic|amazing|wonderful|excellent|thrilled|inspired|pumped|ready)\b/i;
   
   // Default to Neutral
   let detectedMood = 'Neutral';
   
-  // Check for specific emotional patterns (priority order)
-  if (burnoutKeywords.test(text)) {
+  // Priority-based detection (negative emotions checked first)
+  if (burnoutKeywords.test(lowerText)) {
     detectedMood = 'Burnt Out';
-  } else if (anxiousKeywords.test(text)) {
+  } else if (anxiousKeywords.test(lowerText)) {
     detectedMood = 'Anxious';
-  } else if (stressedKeywords.test(text)) {
+  } else if (sadKeywords.test(lowerText)) {
+    detectedMood = 'Stressed'; // Map sadness to stressed
+  } else if (stressedKeywords.test(lowerText)) {
     detectedMood = 'Stressed';
-  } else if (motivatedKeywords.test(text) || result.score > 2) {
+  } else if (result.score <= -3) {
+    // Very negative sentiment
+    detectedMood = 'Stressed';
+  } else if (result.score < -1) {
+    // Moderately negative
+    detectedMood = 'Stressed';
+  } else if (motivatedKeywords.test(lowerText)) {
     detectedMood = 'Motivated';
-  } else if (result.score < -2) {
-    detectedMood = 'Stressed';
-  } else if (result.score > 0) {
+  } else if (result.score >= 3) {
+    // Very positive sentiment
+    detectedMood = 'Motivated';
+  } else if (result.score > 1) {
+    // Moderately positive
     detectedMood = 'Motivated';
   }
   
-  // Log for debugging (remove in production)
-  console.log(`🧠 Mood Detection: "${text.substring(0, 50)}..." → ${detectedMood} (score: ${result.score})`);
+  // Log for debugging
+  console.log(`🧠 Mood Detection: "${text.substring(0, 50)}..." → ${detectedMood} (sentiment score: ${result.score})`);
   
   return detectedMood;
 };

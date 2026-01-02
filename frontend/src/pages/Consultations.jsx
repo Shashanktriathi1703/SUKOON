@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from '../components/Navbar';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL='https://sukoon-vzwh.onrender.com';
 
 export default function Consultations() {
   const { user, logout } = useAuth();

@@ -87,22 +87,33 @@ router.post('/login', async (req, res) => {
     // Create JWT token
     const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '7d' });
     
-    // Set HTTP-only cookie
+    // 🔥 CRITICAL: Cookie settings for cross-origin
+    const isProduction = process.env.NODE_ENV === 'production';
+    
     res.cookie('token', token, { 
       httpOnly: true, 
-      secure: false, // Set to true in production with HTTPS
+      secure: isProduction, // true in production (HTTPS required)
+      sameSite: isProduction ? 'None' : 'Lax', // 'None' for cross-origin
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
     
+    console.log(`✅ Login successful: ${user.email}`);
+    console.log(`🍪 Cookie: secure=${isProduction}, sameSite=${isProduction ? 'None' : 'Lax'}`);
+    
+    // ✅ FIX: Return user object wrapped properly
     res.json({ 
       message: 'Login successful',
-      userId: user._id,
-      username: user.username,
-      email: user.email
+      user: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        moodHistory: user.moodHistory,
+        consultations: user.consultations
+      }
     });
     
   } catch (err) {
-    console.error('Login error:', err);
+    console.error('❌ Login error:', err);
     res.status(500).json({ error: 'Server error during login' });
   }
 });
@@ -114,7 +125,12 @@ router.post('/login', async (req, res) => {
 router.get('/me', async (req, res) => {
   const token = req.cookies.token;
   
+  console.log('📋 /me endpoint hit');
+  console.log('🍪 Cookies:', req.cookies);
+  console.log('🔑 Token present:', !!token);
+  
   if (!token) {
+    console.log('❌ No token found in cookies');
     return res.status(401).json({ error: 'Not authenticated' });
   }
   
@@ -125,13 +141,25 @@ router.get('/me', async (req, res) => {
       .populate('consultations');
     
     if (!user) {
+      console.log('❌ User not found for token');
       return res.status(404).json({ error: 'User not found' });
     }
     
-    res.json(user);
+    console.log(`✅ User authenticated: ${user.email}`);
+    
+    // ✅ FIX: Return user wrapped in object
+    res.json({ 
+      user: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        moodHistory: user.moodHistory,
+        consultations: user.consultations
+      }
+    });
     
   } catch (err) {
-    console.error('Auth verification error:', err);
+    console.error('❌ Token verification error:', err.message);
     res.status(401).json({ error: 'Invalid or expired token' });
   }
 });
@@ -141,7 +169,15 @@ router.get('/me', async (req, res) => {
  * Clear authentication cookie
  */
 router.post('/logout', (req, res) => {
-  res.clearCookie('token');
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'None' : 'Lax'
+  });
+  
+  console.log('👋 User logged out');
   res.json({ message: 'Logged out successfully' });
 });
 

@@ -8,9 +8,9 @@ export default function Navbar({ user, onLogout }) {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
             <div className="w-10 h-10 bg-gradient-to-br from-leaf to-forest rounded-xl flex items-center justify-center transform transition group-hover:scale-110">
-              <span className="text-white font-bold text-xl">M</span>
+              <span className="text-white font-bold text-xl">SAI</span>
             </div>
-            <span className="text-2xl font-bold text-leaf">MoodAI</span>
+            <span className="text-2xl font-bold text-leaf">Sukoon</span>
           </Link>
 
           {/* Navigation */}

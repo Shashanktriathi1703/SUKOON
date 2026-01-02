@@ -4,7 +4,7 @@ import axios from 'axios';
 export default function RazorpayButton() {
   const handlePayment = async () => {
     try {
-      const { data } = await axios.post('http://localhost:5000/api/payment/create-order', {}, {
+      const { data } = await axios.post('https://sukoon-vzwh.onrender.com/api/payment/create-order', {}, {
         withCredentials: true
       });
 
@@ -16,7 +16,7 @@ export default function RazorpayButton() {
         description: "1-to-1 Human Consultation",
         order_id: data.orderId,
         handler: async (response) => {
-          const verify = await axios.post('http://localhost:5000/api/payment/verify-payment', response, {
+          const verify = await axios.post('https://sukoon-vzwh.onrender.com/api/payment/verify-payment', response, {
             withCredentials: true
           });
           alert(verify.data.message);

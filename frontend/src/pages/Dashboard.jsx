@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL='https://sukoon-vzwh.onrender.com';
 
 export default function Dashboard() {
   const { user, logout, refreshUser } = useAuth();
@@ -33,21 +33,25 @@ export default function Dashboard() {
     scrollToBottom();
   }, [chatHistory]);
 
-  useEffect(() => {
-    if (user) {
-      const grouped = user.moodHistory.reduce((acc, entry) => {
-        const date = new Date(entry.date).toDateString();
-        if (!acc[date]) acc[date] = [];
-        acc[date].push(entry);
-        return acc;
-      }, {});
-      setPreviousChats(
-        Object.entries(grouped)
-          .map(([date, entries]) => ({ date, entries }))
-          .reverse()
-      );
-    }
-  }, [user]);
+useEffect(() => {
+  if (user && Array.isArray(user.moodHistory)) {
+    const grouped = user.moodHistory.reduce((acc, entry) => {
+      const date = new Date(entry.date).toDateString();
+      if (!acc[date]) acc[date] = [];
+      acc[date].push(entry);
+      return acc;
+    }, {});
+
+    setPreviousChats(
+      Object.entries(grouped)
+        .map(([date, entries]) => ({ date, entries }))
+        .reverse()
+    );
+  } else {
+    setPreviousChats([]);
+  }
+}, [user]);
+
 
   const handleLogout = () => {
     logout();
@@ -652,7 +656,7 @@ export default function Dashboard() {
                 <button
                   onClick={async () => {
                     try {
-                      const res = await axios.post(
+                      await axios.post(
                         `${API_URL}/api/send-report`,
                         {
                           userId: user._id,
@@ -663,7 +667,7 @@ export default function Dashboard() {
                       );
                       alert("✅ Report sent to " + user.email);
                     } catch (error) {
-                      alert("❌ Failed to send report");
+                      alert("❌ Failed to send report", error.message);
                     }
                   }}
                   className="w-full py-2 bg-white text-blue-600 rounded-lg hover:shadow-lg transition font-semibold text-sm"

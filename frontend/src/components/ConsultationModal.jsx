@@ -3,7 +3,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL='https://sukoon-vzwh.onrender.com';
 const RAZORPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY;
 
 export default function ConsultationModal({ isOpen, onClose, user }) {

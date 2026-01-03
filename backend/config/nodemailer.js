@@ -132,7 +132,7 @@ const sendConsultationEmail = async (email, username, bookingDetails) => {
             </p>
           </div>
           <div class="footer">
-            <p>MoodAI - Your Partner in Wellness 🌿</p>
+            <p>Sukoon AI - Your Partner in Wellness 🌿</p>
             <p>Questions? Reply to this email.</p>
           </div>
         </div>

@@ -1,76 +1,84 @@
-router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+const express = require('express');
+const cors = require('cors');
+const cookieParser = require('cookie-parser');
+const connectDB = require('./config/db');
+const apiRoutes = require('./routes/api');
+const authRoutes = require('./routes/auth');
+const paymentRoutes = require('./routes/payment');
+require('dotenv').config({ quiet: true });
 
-  try {
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password required" });
+// Connect to MongoDB
+connectDB();
+
+const app = express();
+
+// Middleware
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "https://sukoon-omega.vercel.app/", // ADD YOUR DEPLOYED FRONTEND URL
+  // "https://your-frontend-domain.netlify.app", // OR WHATEVER HOSTING YOU USE
+  // Add any other domains where your frontend might be hosted
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('❌ CORS blocked origin:', origin);
+      callback(new Error(`Not allowed by CORS. Origin: ${origin}`));
     }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ error: "Invalid email or password" });
-    }
+app.use(express.json());
+app.use(cookieParser());
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ error: "Invalid email or password" });
-    }
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api', apiRoutes);
+app.use('/api/payment', paymentRoutes);
 
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET, {
-      expiresIn: "7d",
-    });
-
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: true, // REQUIRED on Render
-      sameSite: "None", // REQUIRED cross-site
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    res.json({
-      message: "Login successful",
-      user: {
-        _id: user._id,
-        username: user.username,
-        email: user.email,
-        moodHistory: user.moodHistory,
-        consultations: user.consultations,
-      },
-    });
-  } catch (err) {
-    console.error("Login error:", err);
-    res.status(500).json({ error: "Server error during login" });
-  }
-});
-
-router.get("/me", async (req, res) => {
-  const token = req.cookies.token;
-
-  if (!token) {
-    return res.status(401).json({ error: "Not authenticated" });
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.userId)
-      .select("-password")
-      .populate("consultations");
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    res.json({ user });
-  } catch (err) {
-    return res.status(401).json({ error: "Invalid or expired token" });
-  }
-});
-
-router.post("/logout", (req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: true,
-    sameSite: "None",
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'MoodAI Backend Running',
+    timestamp: new Date(),
+    env: process.env.NODE_ENV || 'development'
   });
-  res.json({ message: "Logged out successfully" });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ 
+    error: 'Route not found',
+    path: req.path,
+    method: req.method
+  });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('❌ Error:', err.stack);
+  res.status(500).json({ 
+    error: 'Something went wrong!', 
+    message: err.message,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🌿 MoodAI Backend running on port ${PORT}`);
+  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`✅ Allowed origins:`, allowedOrigins);
 });

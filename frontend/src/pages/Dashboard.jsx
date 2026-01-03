@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const API_URL='https://sukoon-vzwh.onrender.com';
+const API_URL = 'https://sukoon-vzwh.onrender.com';
 
 export default function Dashboard() {
   const { user, logout, refreshUser } = useAuth();
@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [previousChats, setPreviousChats] = useState([]);
   const [showConsultModal, setShowConsultModal] = useState(false);
+  const [isSendingReport, setIsSendingReport] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -33,25 +34,24 @@ export default function Dashboard() {
     scrollToBottom();
   }, [chatHistory]);
 
-useEffect(() => {
-  if (user && Array.isArray(user.moodHistory)) {
-    const grouped = user.moodHistory.reduce((acc, entry) => {
-      const date = new Date(entry.date).toDateString();
-      if (!acc[date]) acc[date] = [];
-      acc[date].push(entry);
-      return acc;
-    }, {});
+  useEffect(() => {
+    if (user && Array.isArray(user.moodHistory)) {
+      const grouped = user.moodHistory.reduce((acc, entry) => {
+        const date = new Date(entry.date).toDateString();
+        if (!acc[date]) acc[date] = [];
+        acc[date].push(entry);
+        return acc;
+      }, {});
 
-    setPreviousChats(
-      Object.entries(grouped)
-        .map(([date, entries]) => ({ date, entries }))
-        .reverse()
-    );
-  } else {
-    setPreviousChats([]);
-  }
-}, [user]);
-
+      setPreviousChats(
+        Object.entries(grouped)
+          .map(([date, entries]) => ({ date, entries }))
+          .reverse()
+      );
+    } else {
+      setPreviousChats([]);
+    }
+  }, [user]);
 
   const handleLogout = () => {
     logout();
@@ -87,8 +87,6 @@ useEffect(() => {
       };
 
       setChatHistory((prev) => [...prev, botMsg]);
-
-      // Refresh user data WITHOUT page reload
       await refreshUser();
     } catch (err) {
       console.error("Chat error:", err);
@@ -102,6 +100,53 @@ useEffect(() => {
       ]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // ✅ FIXED: Send Report Handler
+  const handleSendReport = async () => {
+    if (isSendingReport) return;
+    
+    setIsSendingReport(true);
+    
+    try {
+      console.log('📧 Sending report for user:', user._id);
+      
+      const res = await axios.post(
+        `${API_URL}/api/send-report`,
+        {
+          userId: user._id,
+        },
+        {
+          withCredentials: true,
+        }
+      );
+
+      console.log('✅ Report response:', res.data);
+
+      if (res.data.success) {
+        if (res.data.emailSent) {
+          alert(`✅ Report sent to ${user.email}!\n\nCheck your inbox in a few minutes.`);
+        } else {
+          alert(`✅ Report generated!\n\n${res.data.message}\n\nStats:\n- Total check-ins: ${res.data.stats.totalEntries}\n- Most common mood: ${res.data.stats.mostCommonMood}\n- Last 7 days: ${res.data.stats.last7DaysCount}`);
+        }
+      }
+    } catch (error) {
+      console.error("❌ Send report error:", error);
+      
+      const errorMsg = error.response?.data?.error || error.message || "Failed to send report";
+      
+      if (error.response?.status === 400) {
+        alert(`⚠️ ${errorMsg}\n\nMake sure you have some chat history first!`);
+      } else if (error.response?.status === 404) {
+        alert("❌ User not found. Please try logging out and logging back in.");
+      } else if (error.response?.status === 500) {
+        alert("❌ Server error. Please try again later or contact support.");
+      } else {
+        alert(`❌ ${errorMsg}`);
+      }
+    } finally {
+      setIsSendingReport(false);
     }
   };
 
@@ -643,38 +688,30 @@ useEffect(() => {
             )}
           </div>
 
-          {/* Sidebar - continues in next part... */}
+          {/* Sidebar */}
           <div className="space-y-6">
+            {/* ✅ FIXED: Weekly Report Card */}
+            <div className="bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl shadow-lg p-6 text-white">
+              <h4 className="font-bold mb-2">📧 Weekly Report</h4>
+              <p className="text-sm text-blue-50 mb-4">
+                Get your mood insights via email
+              </p>
+              <button
+                onClick={handleSendReport}
+                disabled={isSendingReport || !user.moodHistory || user.moodHistory.length === 0}
+                className="w-full py-2 bg-white text-blue-600 rounded-lg hover:shadow-lg transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSendingReport ? "Sending..." : "Send Report Now"}
+              </button>
+              {user.moodHistory?.length === 0 && (
+                <p className="text-xs text-blue-100 mt-2 text-center">
+                  Start chatting to generate a report
+                </p>
+              )}
+            </div>
+
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h4 className="font-bold text-gray-900 mb-4">Quick Stats</h4>
-              {/* Add this in the sidebar, after Quick Stats card */}
-              <div className="bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl shadow-lg p-6 text-white">
-                <h4 className="font-bold mb-2">📧 Weekly Report</h4>
-                <p className="text-sm text-blue-50 mb-4">
-                  Get your mood insights via email
-                </p>
-                <button
-                  onClick={async () => {
-                    try {
-                      await axios.post(
-                        `${API_URL}/api/send-report`,
-                        {
-                          userId: user._id,
-                        },
-                        {
-                          withCredentials: true,
-                        }
-                      );
-                      alert("✅ Report sent to " + user.email);
-                    } catch (error) {
-                      alert("❌ Failed to send report", error.message);
-                    }
-                  }}
-                  className="w-full py-2 bg-white text-blue-600 rounded-lg hover:shadow-lg transition font-semibold text-sm"
-                >
-                  Send Report Now
-                </button>
-              </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
                   <span className="text-sm text-gray-700">Total Chats</span>

@@ -38,24 +38,22 @@ router.post('/chat', async (req, res) => {
         `Your motivation is fantastic! ${recommendations.length > 0 ? 'I found some activities that might enhance your positive mood:\n\n' + recTexts : 'How can I help you make the most of this energy?'}`
       ],
       Neutral: [
-  `Thank you for checking in. I'm here to support you. ${
-    recommendations.length > 0
-      ? 'Here are some activities that might interest you:\n\n' + recTexts
-      : 'How can I help you today?'
-  }`,
-
-  `I appreciate you sharing how you're feeling. ${
-    recommendations.length > 0
-      ? 'Would any of these activities be helpful?\n\n' + recTexts
-      : 'Is there anything specific you’d like to talk about?'
-  }`,
-
-  `I am here to listen. ${
-    recommendations.length > 0
-      ? 'I have some suggestions that might be enjoyable:\n\n' + recTexts
-      : 'What is on your mind?'
-  }`
-],
+        `Thank you for checking in. I'm here to support you. ${
+          recommendations.length > 0
+            ? 'Here are some activities that might interest you:\n\n' + recTexts
+            : 'How can I help you today?'
+        }`,
+        `I appreciate you sharing how you're feeling. ${
+          recommendations.length > 0
+            ? 'Would any of these activities be helpful?\n\n' + recTexts
+            : 'Is there anything specific you'd like to talk about?'
+        }`,
+        `I am here to listen. ${
+          recommendations.length > 0
+            ? 'I have some suggestions that might be enjoyable:\n\n' + recTexts
+            : 'What is on your mind?'
+        }`
+      ],
       'Stressed': [
         `I hear that you're feeling stressed. That's completely valid, and you're not alone. ${recommendations.length > 0 ? 'Here are some immediate relief strategies:\n\n' + recTexts + '\n\nWould you like to try any of these?' : 'Would you like to talk about what\'s causing the stress?'}`,
         `Stress can be overwhelming. Remember, it's okay to take breaks. ${recommendations.length > 0 ? 'These techniques might help you feel better:\n\n' + recTexts : 'What would help you most right now?'}`,
@@ -125,17 +123,26 @@ router.post('/chat', async (req, res) => {
 /**
  * POST /api/send-report
  * Send mood report to user's email
+ * ✅ FIXED VERSION with better error handling
  */
 router.post('/send-report', async (req, res) => {
   try {
     const { userId } = req.body;
     
+    console.log('📧 Send report requested for userId:', userId);
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    
     const user = await User.findById(userId).select('-password');
     if (!user) {
+      console.log('❌ User not found:', userId);
       return res.status(404).json({ error: 'User not found' });
     }
 
     if (!user.moodHistory || user.moodHistory.length === 0) {
+      console.log('❌ No mood data for user:', user.email);
       return res.status(400).json({ error: 'No mood data available to generate report' });
     }
 
@@ -154,6 +161,22 @@ router.post('/send-report', async (req, res) => {
     const last7Days = user.moodHistory.filter(entry => 
       new Date(entry.date) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     );
+
+    // ✅ CHECK if email is configured
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.log('⚠️ Email not configured, sending report data without email');
+      return res.json({
+        success: true,
+        message: 'Report generated! (Email service not configured)',
+        emailSent: false,
+        stats: {
+          totalEntries,
+          mostCommonMood,
+          last7DaysCount: last7Days.length,
+          moodBreakdown: moodCounts
+        }
+      });
+    }
 
     // Send email
     const transporter = nodemailer.createTransport({
@@ -254,18 +277,18 @@ router.post('/send-report', async (req, res) => {
                 <p style="color: #78350f; margin: 0; line-height: 1.6;">
                   ${wellnessTip}
                 </p>
-                <a href="http://localhost:5173" class="cta-button">Open MoodAI Dashboard</a>
+                <a href="https://sukoon-omega.vercel.app" class="cta-button">Open MoodAI Dashboard</a>
               </div>
 
               <div style="margin-top: 32px; padding: 20px; background: #f0f9ff; border-radius: 12px;">
                 <h4 style="margin: 0 0 12px 0; color: #1e40af;">📅 Need More Support?</h4>
                 <p style="margin: 0; color: #1e3a8a; font-size: 14px;">
-                  Book a 1-on-1 consultation with our certified wellness experts. 60-minute personalized sessions available for just ₹999.
+                  Book a 1-on-1 consultation with our certified wellness experts. 60-minute personalized sessions available.
                 </p>
               </div>
             </div>
             <div class="footer">
-              <p style="margin: 0;">MoodAI - Your Partner in Wellness 🌿</p>
+              <p style="margin: 0;">SukoonAI - Your Partner in Wellness 🌿</p>
               <p style="margin: 8px 0 0 0; font-size: 12px;">Keep checking in daily for the best insights!</p>
             </div>
           </div>
@@ -274,23 +297,43 @@ router.post('/send-report', async (req, res) => {
       `,
     };
 
-    await transporter.sendMail(mailOptions);
-    console.log(`✉️ Report email sent to ${user.email}`);
+    try {
+      await transporter.sendMail(mailOptions);
+      console.log(`✉️ Report email sent to ${user.email}`);
 
-    res.json({
-      success: true,
-      message: 'Report sent successfully to your email!',
-      stats: {
-        totalEntries,
-        mostCommonMood,
-        last7DaysCount: last7Days.length
-      }
-    });
+      res.json({
+        success: true,
+        message: 'Report sent successfully to your email!',
+        emailSent: true,
+        stats: {
+          totalEntries,
+          mostCommonMood,
+          last7DaysCount: last7Days.length,
+          moodBreakdown: moodCounts
+        }
+      });
+    } catch (emailError) {
+      console.error('❌ Email send failed:', emailError.message);
+      
+      // Still return success with stats, but note email failed
+      res.json({
+        success: true,
+        message: 'Report generated! (Email delivery failed - check email configuration)',
+        emailSent: false,
+        emailError: emailError.message,
+        stats: {
+          totalEntries,
+          mostCommonMood,
+          last7DaysCount: last7Days.length,
+          moodBreakdown: moodCounts
+        }
+      });
+    }
     
   } catch (error) {
-    console.error('Send report error:', error);
+    console.error('❌ Send report error:', error);
     res.status(500).json({ 
-      error: 'Failed to send report',
+      error: 'Failed to generate report',
       details: error.message 
     });
   }

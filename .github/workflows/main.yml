@@ -1,10 +1,13 @@
 name: SUKOON
+
 on:
   push:
-    branches: [master]
+    branches:
+      - master   # change to 'main' if that's your default branch
+
 jobs:
   demo:
     runs-on: ubuntu-latest
-    steps: 
+    steps:
       - name: Greetings
-      run: echo "Hello from my side"
+        run: echo "Hello from my side"
